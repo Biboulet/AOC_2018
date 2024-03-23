@@ -1,0 +1,163 @@
+use std::{collections::HashMap, collections::VecDeque, default, vec, ops::Add};
+
+use itertools::Itertools;
+
+const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+// type Worker = (char, u32);
+struct Worker {
+    char_currently_working_on: char,
+    working_time_remaining: u32,
+}
+
+impl Worker {
+    fn can_work(&self) -> bool {
+        return self.working_time_remaining == 0;
+    }
+
+    fn compute_working_time(&self, i: &char) -> u32 {
+        return 60 + ALPHABET.chars().into_iter().position(|a| a == *i).unwrap() as u32 + 1;
+    }
+    fn new(char_currently_working_on: char, working_time_remaining: u32) -> Self {
+        return Self {
+            char_currently_working_on,
+            working_time_remaining,
+        };
+    }
+}
+impl Default for Worker {
+    fn default() -> Self {
+        Self {
+            char_currently_working_on: ' ',
+            working_time_remaining: 0,
+        }
+    }
+}
+impl From<String> for Worker {
+    fn from(value: String) -> Self {
+        todo!()
+    }
+    
+}
+
+
+pub fn compute_results(input: Vec<String>) -> (String, u32) {
+    let instructions = parse_input(input);
+    return ("".to_string(), solve_part2(&instructions, 5));
+}
+
+fn solve_part2(instructions: &HashMap<char, Vec<char>>, workers_num: u32) -> u32 {
+    let mut completed_steps: Vec<char> = Vec::new();
+    let mut workers: Vec<Worker> = {Worker::new(' ',0)};
+    let mut sec = 0;
+    let a = completed_steps;
+    while completed_steps.len() < 26 as usize {
+        update_workers(&mut workers, &mut completed_steps);
+        let mut available_steps: VecDeque<char> =
+            get_sorted_available_steps(&instructions, &completed_steps, &workers).into();
+
+        workers = Give_work(&workers, available_steps);
+        sec += 1;
+    }
+    return sec - 1;
+}
+
+fn Give_work(workers: &Vec<Worker>, mut available_steps: VecDeque<char>) -> Vec<Worker> {
+    workers
+        .iter()
+        .map(|curr_worker| {
+            if curr_worker.can_work() {
+                if let Some(i) = available_steps.pop_front() {
+                    return Worker::new(i, compute_working_time(&i));
+                }
+            }
+            return *curr_worker;
+        })
+        .collect_vec()
+}
+
+fn can_work(curr_worker: &(char, u32)) -> bool {
+    return curr_worker.1 == 0;
+}
+
+fn compute_working_time(i: &char) -> u32 {
+    return 60 + ALPHABET.chars().into_iter().position(|a| a == *i).unwrap() as u32 + 1;
+}
+
+fn update_workers(workers: &mut Vec<Worker>, completed_steps: &mut Vec<char>) {
+    let mut new_completed_steps = completed_steps.clone();
+    *workers = workers
+        .iter()
+        .map(|curr_worker| {
+            if curr_worker.char_currently_working_on != ' ' {
+                let new_worker: Worker = Worker::new(
+                    curr_worker.char_currently_working_on,
+                    curr_worker.working_time_remaining - 1,
+                );
+                if new_worker.working_time_remaining == 0 {
+                    new_completed_steps.push(curr_worker.char_currently_working_on);
+                    return Worker::new(' ', 0);
+                } else {
+                    return new_worker;
+                }
+            } else {
+                return Worker::new(' ', 0);
+            }
+        })
+        .collect_vec();
+
+    *completed_steps = new_completed_steps.clone();
+
+}
+
+fn solve(instructions: &HashMap<char, Vec<char>>) -> String {
+    let mut completed_steps = String::new();
+
+    while completed_steps.len() < 26 {
+        completed_steps.push(
+            get_sorted_available_steps(
+                instructions,
+                &completed_steps.chars().collect_vec(),
+                &[].to_vec(),
+            )[0],
+        );
+    }
+    return completed_steps;
+}
+
+fn get_sorted_available_steps(
+    instructions: &HashMap<char, Vec<char>>,
+    completed_steps: &Vec<char>,
+    workers: &Vec<Worker>,
+) -> Vec<char> {
+    instructions
+        .iter()
+        .filter(|(key, val)| {
+            return !completed_steps.contains(*key)
+                && !workers
+                    .iter()
+                    .map(|curr_worker| curr_worker.char_currently_working_on)
+                    .contains(*key)
+                && val
+                    .iter()
+                    .all(|condition| completed_steps.contains(condition));
+        })
+        .map(|(key, _val)| *key)
+        .sorted_by_key(|key| *key as u32)
+        .collect_vec()
+}
+
+fn parse_input(input: Vec<String>) -> HashMap<char, Vec<char>> {
+    let mut instructions = ALPHABET.chars().fold(
+        HashMap::new(),
+        |mut hashmap: HashMap<char, Vec<char>>, curr_char| {
+            hashmap.insert(curr_char, vec![]);
+            return hashmap;
+        },
+    );
+    for curr_instr in input.iter() {
+        let condition = curr_instr.chars().nth(5).unwrap();
+        let consequence = curr_instr.chars().nth(36).unwrap();
+        instructions.get_mut(&consequence).unwrap().push(condition);
+    }
+    instructions
+}
